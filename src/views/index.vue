@@ -29,12 +29,12 @@
       </el-col>
      
     </el-row>
-    <el-row :gutter="20" class="mb-8 trend-chart">
-      <el-col :span="8">
+    <el-row :gutter="2" class="mb-8 trend-chart">
+      <el-col :span="24">
         <el-card shadow="hover">
           <div class="card-content">
             <h3 class="text-sm font-medium text-gray-500 mb-2">近7日收益趋势</h3>
-            <div ref="trendChart" style="width: 100%; height: 300px;"></div>
+            <div ref="trendChart" style="width: 110%; height: 300px; margin-left: -10%;"></div>
           </div>
         </el-card>
       </el-col>
@@ -99,7 +99,7 @@
                   <el-step title="开始" :description="investment.createTime"></el-step>
                   <el-step title="转入保证金" :description="`向保证金存款地址中存入${investment.marginAmount}U`"></el-step>
                   <el-step title="购买代币" :description="`购买${investment.orderAmount -investment.marginAmount}U的${investment.product.productConfig.stake_value_type}`"></el-step>
-                  <el-step title="转入代币" :description="`向${investment.product.productConfig.stake_value_type}存款地址中转入${investment.product.productConfig.stake_value_type}`"></el-step>
+                  <el-step title="转入代币" :description="`向质押钱包地址中转入${investment.product.productConfig.stake_value_type}`"></el-step>
                   <el-step title="质押" :description="`把ENA存款地址中ENA质押到收益池`"></el-step>
                   <el-step title="收益" :description="`进入收益期:${investment.orderTime}`"></el-step>
                   <el-step title="赎回" :description="`赎回并结算收益:${investment.orderEndtime}`"></el-step>
@@ -109,8 +109,16 @@
                   <el-button type="primary" @click="isMetamaskConnected ? stakeToken(investment) : connectMetamask()">
                     {{ isMetamaskConnected ? `质押${investment.product.productConfig.stake_value_type}` : '连接钱包' }}
                   </el-button>
-                  <el-button type="primary"  v-if="isMetamaskConnected" @click="disconnectMetamask">
+                  <el-button type="primary"  v-if="isMetamaskConnected"  @click="disconnectMetamask">
                     断开连接
+                  </el-button>
+                </el-col>
+                <el-col :span="6" v-else-if="investment.orderStatus==2" v-hasRole="['trader']" @click="handleBuyClick(investment)">
+                  <el-button type="primary">
+                    购买
+                  </el-button>
+                  <el-button type="primary"  >
+                    详情
                   </el-button>
                 </el-col>
               </el-row>
@@ -131,13 +139,56 @@
 
     
   </div>
+
+  <!-- 购买弹框 -->
+  <el-dialog v-model="showBuyDialog" title="购买" width="30%" @close="resetDialogState">
+    <el-form label-width="100px">
+      <el-form-item label="选择账户">
+        <el-select 
+          v-model="selectedAccount" 
+          placeholder="请选择账户"
+          @change="handleAccountChange"
+          clearable
+        >
+          <el-option
+            v-for="account in accounts"
+            :key="account.apiKey"
+            :label="account.walletName"
+            :value="account.apiKey"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item v-if="!hasTradePassword" label="交易密码">
+        <el-input v-model="tradePassword" type="password" />
+        <el-button @click="saveTradePassword">确认</el-button>
+      </el-form-item>
+      <el-form-item label="账户余额">
+        <el-input v-model="accountBalance" disabled />
+      </el-form-item>
+      <el-form-item label="购买金额">
+        <el-input v-model="buyAmount" type="number" />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="cancelBuy">取消</el-button>
+      <el-button type="primary" @click="confirmBuy">确认</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script>
 import { listAllInvestments,stakeToken } from "@/api/system/order"
 import { getLatestProfit } from "@/api/system/profit"
+import {listAllRecord} from "@/api/system/record"
 import * as echarts from 'echarts';
 import { ethers } from 'ethers';
+import {get_signed_param,getWalletBalanceParam,getBuySymbolParam} from '@/utils/binance_sig.js'
+import {addAccount, getAccount} from '@/utils/db.js'
+import {hashString,aesDecrypt} from '@/utils/jsencrypt.js'
+import {getAllAccountsByUserId} from '@/utils/db.js'
+import Cookies from 'js-cookie'
+import { getWalletBalance,buySymbol } from '@/api/system/wallet'
+
 
 export default {
   data() {
@@ -158,19 +209,40 @@ export default {
       trendChart:{},
       apy:0,
       tableColumns:[],
+      investment:null,
       investments: [
         // 保持原有的投资数据不变
       ],
       isMetamaskConnected:false,
       currentWalletAddress:null,
       provider: null,
+      showBuyDialog: false,
+      selectedAccount: '',
+      accountBalance: 0,
+      buyAmount: 0,
+      accounts: [],
+      hasTradePassword: true,
+      tradePassword: '',
     };
   },
   created() {
     this.listAllInvestment()
     this.getLatestProfits()
     this.checkMetamaskConnection()
+    const payload={}
+    payload["symbol"]="ENAUSDT"
+    payload["orderId"]=1961830413
 
+    const apiSecret="4v5R1CHIB5SuR7jAQ4qY8GcpXfA3ElkgMxkEjWPEQlnL8zziPcmkyNn1IzKURUv8"
+    const signed_param = get_signed_param(apiSecret,payload)
+    let  a=  hashString("hello")
+    const apiKey='Fu9O8WhfA2bbsFb2AxZDF0giKEAHord1nvAf4oigowCHUVKagNbR1GjN1G00j05a'
+    addAccount({userId:1,appKey:"222",apiKey:apiKey}).then(res=>{
+      getAccount(1,"222").then(res=>{
+        console.log(res)
+      })
+    })
+    
     if (typeof window.ethereum !== 'undefined') {
       // 监听 accountsChanged 事件
       window.ethereum.on('accountsChanged', (accounts) => {
@@ -208,6 +280,93 @@ export default {
     }
   },
   methods: {
+    resetDialogState() {
+    this.selectedAccount = '';
+    this.accountBalance = '';
+    this.buyAmount = '';
+    this.hasTradePassword = true;
+    this.tradePassword = '';
+  },
+    handleBuyClick(investment) {
+      getAllAccountsByUserId(investment.buyerId).then(res=>{
+        this.investment = investment
+        this.accounts = res
+        this.showBuyDialog = true;
+      })
+    },
+    getApiSecret(account,tradePassword){
+      return aesDecrypt(account.apiSecret,tradePassword)
+    },
+    handleAccountChange(value) {
+      // this.selectedAccount = value;
+      this.accountBalance=0;
+      const account = this.accounts.find(a => a.apiKey === value);
+      let tradePasswordRes =  Cookies.get(this.selectedAccount);
+      if(tradePasswordRes){
+        let apiSecret = this.getApiSecret(account,tradePasswordRes)
+        if(apiSecret && apiSecret.length>0){
+          this.hasTradePassword = true;
+          this.tradePassword = tradePasswordRes
+          this.getSelectedWalletBalance(account)
+        }
+      }else{
+        this.hasTradePassword = false;
+      }
+      // this.accountBalance = account ? account.balance : 0;
+    },
+    saveTradePassword() {
+    // 保存交易密码到cookie
+    const account = this.accounts.find(a => a.apiKey === this.selectedAccount);
+    let apiSecret = this.getApiSecret(account,this.tradePassword)
+    if(apiSecret && apiSecret.length>0){
+          this.hasTradePassword = true;
+          Cookies.set(this.selectedAccount, this.tradePassword, { expires: 7 })
+          this.getSelectedWalletBalance(account)
+    }else{
+      this.tradePassword=""
+      this.$message.error('交易密码错误');
+    }
+
+  },
+  getSelectedWalletBalance(account) {
+    let apiSecret = this.getApiSecret(account,this.tradePassword)
+    let signedParam = getWalletBalanceParam(apiSecret)
+    const param = {
+      "walletAddress": account.apiKey,
+      "signedParam": signedParam,
+      "userId": account.userId,
+      "symbol":"USDT"
+    }
+    getWalletBalance(param).then(res=>{
+      this.accountBalance = res.data
+    })
+  },
+  confirmBuy() {
+    if (parseFloat(this.buyAmount) > parseFloat(this.accountBalance)) {
+      this.$message.error('购买金额不能超过账户余额');
+      return;
+    }
+    const account = this.accounts.find(a => a.apiKey === this.selectedAccount);
+    let apiSecret = this.getApiSecret(account,this.tradePassword)
+    let symbol = this.investment.product.productConfig.stake_value_type+"USDT"
+    let signedParam = getBuySymbolParam(apiSecret,symbol,parseFloat(this.buyAmount))
+    const param = {
+      "walletAddress": account.apiKey,
+      "signedParam": signedParam,
+      "userId": account.userId,
+    }
+    buySymbol(param).then(res=>{
+      this.accountBalance = res.data
+    })
+    
+    
+    this.showBuyDialog = false;
+  },
+    cancelBuy() {
+      this.resetDialogState()
+      this.showBuyDialog = false;
+    },
+  
     async connectMetamask() {
       if (typeof window.ethereum !== 'undefined') {
         try {
@@ -288,11 +447,13 @@ export default {
         }
         //遍历profitsByDay，计算每天的平均apy 
         for(let key in profitsByDay){
-          profitsByDay[key]["average"] = profitsByDay[key].sum / profitsByDay[key].count
+          profitsByDay[key]["average"] = profitsByDay[key].sum / profitsByDay[key].count*100
         }
         this.trendChart = profitsByDay
-        this.apy = profitsByDay[day].average.toFixed(2)
-
+        this.apy = parseFloat(response.avgApy).toFixed(2);
+         this.totalAmount = response.totalAmount
+        this.totalProfit = parseFloat(response.profits).toFixed(2);
+        this.unconfirmedAmount = response.unconfirmedTotalAmount
         // 绘制图表
         this.drawTrendChart(profitsByDay);
       })
@@ -308,21 +469,12 @@ export default {
           products[i].productConfig = JSON.parse(products[i].productConfig)
           productsMap[products[i].id] = products[i]
         } 
-         
-        let  unconfirmedAmountTemp = 0
-        let  totalAmountTemp = 0
-        let  totalProfitTemp = 0
+        
         for(let i=0;i<this.investments.length;i++){
           this.investments[i].product = productsMap[this.investments[i].productId]
-          totalAmountTemp+= this.investments[i].orderAmount
-          if(this.investments[i].orderStatus != 4){
-            unconfirmedAmountTemp += this.investments[i].orderAmount
-          }
-          totalProfitTemp += this.investments[i].confirmProfit
+          
         }
-        this.totalAmount = totalAmountTemp
-        this.totalProfit = totalProfitTemp
-        this.unconfirmedAmount = unconfirmedAmountTemp
+       
         console.log(this.investments)
       })
     },
@@ -360,7 +512,7 @@ export default {
         },
         yAxis: {
           type: 'value',
-          name: '每日平均 APY'
+          name: '每日平均 APY(%)'
         },
         series: [{
           data: averages,

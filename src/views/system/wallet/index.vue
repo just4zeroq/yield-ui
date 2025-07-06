@@ -1,12 +1,12 @@
 <template>
   <div class="app-container">
-    <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="用户编号" prop="userId">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
+      <el-form-item label="用户id" prop="userId">
         <el-input
           v-model="queryParams.userId"
           placeholder="请输入用户id"
           clearable
-          @keyup.enter.native="handleQuery"
+          @keyup.enter="handleQuery"
         />
       </el-form-item>
       <el-form-item label="钱包地址" prop="walletAddress">
@@ -14,20 +14,28 @@
           v-model="queryParams.walletAddress"
           placeholder="请输入钱包地址"
           clearable
-          @keyup.enter.native="handleQuery"
+          @keyup.enter="handleQuery"
         />
       </el-form-item>
-      <!--<el-form-item label="${comment}" prop="walletChain">
+      <el-form-item label="钱包来源" prop="walletChain">
         <el-input
           v-model="queryParams.walletChain"
-          placeholder="请输入链"
+          placeholder="请输入钱包来源"
           clearable
-          @keyup.enter.native="handleQuery"
+          @keyup.enter="handleQuery"
         />
-      </el-form-item> -->
+      </el-form-item>
+      <el-form-item label="钱包类型" prop="walletType">
+        <el-input
+          v-model="queryParams.walletType"
+          placeholder="请输入钱包类型"
+          clearable
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
       <el-form-item>
-        <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
-        <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
+        <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
+        <el-button icon="Refresh" @click="resetQuery">重置</el-button>
       </el-form-item>
     </el-form>
 
@@ -36,8 +44,7 @@
         <el-button
           type="primary"
           plain
-          icon="el-icon-plus"
-          size="mini"
+          icon="Plus"
           @click="handleAdd"
           v-hasPermi="['system:wallet:add']"
         >新增</el-button>
@@ -46,8 +53,7 @@
         <el-button
           type="success"
           plain
-          icon="el-icon-edit"
-          size="mini"
+          icon="Edit"
           :disabled="single"
           @click="handleUpdate"
           v-hasPermi="['system:wallet:edit']"
@@ -57,8 +63,7 @@
         <el-button
           type="danger"
           plain
-          icon="el-icon-delete"
-          size="mini"
+          icon="Delete"
           :disabled="multiple"
           @click="handleDelete"
           v-hasPermi="['system:wallet:remove']"
@@ -68,38 +73,25 @@
         <el-button
           type="warning"
           plain
-          icon="el-icon-download"
-          size="mini"
+          icon="Download"
           @click="handleExport"
           v-hasPermi="['system:wallet:export']"
         >导出</el-button>
       </el-col>
-      <right-toolbar :showSearch.sync="showSearch" @queryTable="getList"></right-toolbar>
+      <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
     <el-table v-loading="loading" :data="walletList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="钱包编号" align="center" prop="id" />
-      <el-table-column label="用户编号" align="center" prop="userId" />
+      <el-table-column label="用户id" align="center" prop="userId" />
       <el-table-column label="钱包地址" align="center" prop="walletAddress" />
-      <el-table-column label="链编码" align="center" prop="walletChain" />
+      <el-table-column label="钱包来源" align="center" prop="walletChain" />
       <el-table-column label="钱包状态" align="center" prop="walletStatus" />
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-        <template slot-scope="scope">
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-edit"
-            @click="handleUpdate(scope.row)"
-            v-hasPermi="['system:wallet:edit']"
-          >修改</el-button>
-          <el-button
-            size="mini"
-            type="text"
-            icon="el-icon-delete"
-            @click="handleDelete(scope.row)"
-            v-hasPermi="['system:wallet:remove']"
-          >删除</el-button>
+        <template #default="scope">
+          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:wallet:edit']">修改</el-button>
+          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:wallet:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -107,172 +99,265 @@
     <pagination
       v-show="total>0"
       :total="total"
-      :page.sync="queryParams.pageNum"
-      :limit.sync="queryParams.pageSize"
+      v-model:page="queryParams.pageNum"
+      v-model:limit="queryParams.pageSize"
       @pagination="getList"
     />
 
     <!-- 添加或修改钱包管理对话框 -->
-    <el-dialog :title="title" :visible.sync="open" width="500px" append-to-body>
-      <el-form ref="form" :model="form" :rules="rules" label-width="80px">
-        <el-form-item label="用户编号" prop="userId">
-          <el-input v-model="form.userId" placeholder="请输入用户编号" />
+    <el-dialog :title="title" v-model="open" width="60%" append-to-body @open="handleOpen">
+      <el-form ref="walletRef" :model="form" :rules="rules" label-width="100px">
+        <el-form-item label="用户id" prop="userId">
+          <el-select v-model="form.userId" placeholder="请选择用户">
+            <el-option
+              v-for="investor in investors"
+              :key="investor.userId"
+              :label="investor.userName"
+              :value="investor.userId"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item label="钱包地址" prop="walletAddress">
-          <el-input v-model="form.walletAddress" placeholder="请输入钱包地址" />
+        <el-form-item label="钱包名称" prop="walletName">
+            <el-input v-model="form.walletName" placeholder="请输入钱包名称" />
+          </el-form-item>
+
+        <el-form-item label="钱包类型" prop="walletType">
+          <el-select v-model="form.walletType" placeholder="请选择钱包类型">
+            <el-option label="链上" value="chain" />
+            <el-option label="交易所" value="cex" />
+          </el-select>
         </el-form-item>
-        <el-form-item label="链编码" prop="walletChain">
-          <el-input v-model="form.walletChain" placeholder="请输入链编码" />
+        <el-form-item label="钱包来源" prop="walletChain">
+          <el-select v-model="form.walletChain" placeholder="请选择钱包来源">
+            <el-option
+              v-for="item in walletSourceOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <template v-if="form.walletType === 'chain'">
+          <el-form-item label="钱包地址" prop="walletAddress">
+            <el-input v-model="form.walletAddress" placeholder="请输入钱包地址" />
+          </el-form-item>
+        </template>
+        <template v-else-if="form.walletType === 'cex'">
+          <el-form-item label="API Key" prop="apiKey">
+            <el-input v-model="form.apiKey" placeholder="请输入 API Key" />
+          </el-form-item>
+          <el-form-item label="API Secret" prop="apiSecret">
+            <el-input v-model="form.apiSecret" placeholder="请输入 API Secret" />
+          </el-form-item>
+        </template>
+        <!-- 根据钱包类型显示交易密码输入框 -->
+        <el-form-item v-if="form.walletType === 'cex'" label="交易密码" prop="tradePassword">
+          <el-input v-model="form.tradePassword" type="password" placeholder="请输入交易密码" />
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="submitForm">确 定</el-button>
-        <el-button @click="cancel">取 消</el-button>
-      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="submitForm">确 定</el-button>
+          <el-button @click="cancel">取 消</el-button>
+        </div>
+      </template>
     </el-dialog>
   </div>
 </template>
 
-<script>
+<script setup name="Wallet">
 import { listWallet, getWallet, delWallet, addWallet, updateWallet } from "@/api/system/wallet"
+import { getAllInvestor } from "@/api/system/user"
+import {hashString,encrypt,aesEncrypt,aesDecrypt} from "@/utils/jsencrypt"
+import {addAccount, getAllAccountsByUserId} from '@/utils/db'
+import { ref, computed } from 'vue';
+const { proxy } = getCurrentInstance()
 
-export default {
-  name: "Wallet",
-  data() {
-    return {
-      // 遮罩层
-      loading: true,
-      // 选中数组
-      ids: [],
-      // 非单个禁用
-      single: true,
-      // 非多个禁用
-      multiple: true,
-      // 显示搜索条件
-      showSearch: true,
-      // 总条数
-      total: 0,
-      // 钱包管理表格数据
-      walletList: [],
-      // 弹出层标题
-      title: "",
-      // 是否显示弹出层
-      open: false,
-      // 查询参数
-      queryParams: {
-        pageNum: 1,
-        pageSize: 10,
-        userId: null,
-        walletAddress: null,
-        walletChain: null,
-        walletStatus: null,
-      },
-      // 表单参数
-      form: {},
-      // 表单校验
-      rules: {
-      }
-    }
+const walletList = ref([])
+const open = ref(false)
+const loading = ref(true)
+const showSearch = ref(true)
+const ids = ref([])
+const single = ref(true)
+const multiple = ref(true)
+const total = ref(0)
+const title = ref("")
+const investors = ref([]);
+
+const data = reactive({
+  form: {walletType:'chain'},
+  queryParams: {
+    pageNum: 1,
+    pageSize: 10,
+    userId: null,
+    walletAddress: null,
+    walletChain: null,
+    walletStatus: null,
+    walletType: null
   },
-  created() {
-    this.getList()
-  },
-  methods: {
-    /** 查询钱包管理列表 */
-    getList() {
-      this.loading = true
-      listWallet(this.queryParams).then(response => {
-        this.walletList = response.rows
-        this.total = response.total
-        this.loading = false
-      })
-    },
-    // 取消按钮
-    cancel() {
-      this.open = false
-      this.reset()
-    },
-    // 表单重置
-    reset() {
-      this.form = {
-        id: null,
-        userId: null,
-        walletAddress: null,
-        walletChain: null,
-        walletStatus: null,
-        createTime: null,
-        updateTime: null
-      }
-      this.resetForm("form")
-    },
-    /** 搜索按钮操作 */
-    handleQuery() {
-      this.queryParams.pageNum = 1
-      this.getList()
-    },
-    /** 重置按钮操作 */
-    resetQuery() {
-      this.resetForm("queryForm")
-      this.handleQuery()
-    },
-    // 多选框选中数据
-    handleSelectionChange(selection) {
-      this.ids = selection.map(item => item.id)
-      this.single = selection.length!==1
-      this.multiple = !selection.length
-    },
-    /** 新增按钮操作 */
-    handleAdd() {
-      this.reset()
-      this.open = true
-      this.title = "添加钱包管理"
-    },
-    /** 修改按钮操作 */
-    handleUpdate(row) {
-      this.reset()
-      const id = row.id || this.ids
-      getWallet(id).then(response => {
-        this.form = response.data
-        this.open = true
-        this.title = "修改钱包管理"
-      })
-    },
-    /** 提交按钮 */
-    submitForm() {
-      this.$refs["form"].validate(valid => {
-        if (valid) {
-          if (this.form.id != null) {
-            updateWallet(this.form).then(response => {
-              this.$modal.msgSuccess("修改成功")
-              this.open = false
-              this.getList()
-            })
-          } else {
-            addWallet(this.form).then(response => {
-              this.$modal.msgSuccess("新增成功")
-              this.open = false
-              this.getList()
-            })
-          }
-        }
-      })
-    },
-    /** 删除按钮操作 */
-    handleDelete(row) {
-      const ids = row.id || this.ids
-      this.$modal.confirm('是否确认删除钱包管理编号为"' + ids + '"的数据项？').then(function() {
-        return delWallet(ids)
-      }).then(() => {
-        this.getList()
-        this.$modal.msgSuccess("删除成功")
-      }).catch(() => {})
-    },
-    /** 导出按钮操作 */
-    handleExport() {
-      this.download('system/wallet/export', {
-        ...this.queryParams
-      }, `wallet_${new Date().getTime()}.xlsx`)
-    }
+  rules: {
+    walletType: [
+      { required: true, message: "钱包类型不能为空", trigger: "blur" }
+    ]
   }
+})
+
+const walletSourceOptions = computed(() => { 
+  if (form.value.walletType === 'chain') {
+    return [
+      { value: 'ARB', label: 'ARB' },
+      { value: 'ETH', label: 'ETH' }
+    ];
+  } else if (form.value.walletType === 'cex') {
+    return [
+      { value: 'binance', label: 'binance' },
+      { value: 'bitget', label: 'bitget' },
+      { value: 'bybit', label: 'bybit' }
+    ];
+  }
+  return [];
+});
+
+const { queryParams, form, rules } = toRefs(data)
+
+/** 查询钱包管理列表 */
+function getList() {
+  loading.value = true
+  listWallet(queryParams.value).then(response => {
+    walletList.value = response.rows
+    total.value = response.total
+    loading.value = false
+  })
 }
+
+// 取消按钮
+function cancel() {
+  open.value = false
+  reset()
+}
+
+// 表单重置
+function reset() {
+  form.value = {
+    id: null,
+    userId: null,
+    walletAddress: null,
+    walletChain: null,
+    walletStatus: null,
+    createTime: null,
+    updateTime: null,
+    walletType: null,
+    tradePassword: null,
+    walletName:null
+  }
+  proxy.resetForm("walletRef")
+}
+
+/** 搜索按钮操作 */
+function handleQuery() {
+  queryParams.value.pageNum = 1
+  getList()
+}
+
+/** 重置按钮操作 */
+function resetQuery() {
+  proxy.resetForm("queryRef")
+  handleQuery()
+}
+
+// 多选框选中数据
+function handleSelectionChange(selection) {
+  ids.value = selection.map(item => item.id)
+  single.value = selection.length != 1
+  multiple.value = !selection.length
+}
+
+/** 新增按钮操作 */
+function handleAdd() {
+  reset()
+  open.value = true
+  title.value = "添加钱包管理"
+}
+
+/** 修改按钮操作 */
+function handleUpdate(row) {
+  reset()
+  const _id = row.id || ids.value
+  getWallet(_id).then(response => {
+    form.value = response.data
+    open.value = true
+    title.value = "修改钱包管理"
+  })
+}
+/**打开新建钱包太狂 */
+ function handleOpen(){
+  form.value = {
+
+    walletType: 'chain'
+  }
+  getAllInvestor().then(response => 
+    {
+      investors.value = response.data;
+    }
+  );
+ 
+}
+/** 提交按钮 */
+function submitForm() {
+  
+  proxy.$refs["walletRef"].validate(valid => {
+    if (valid) {
+      if (form.value.id != null) {
+        updateWallet(form.value).then(response => {
+          proxy.$modal.msgSuccess("修改成功")
+          open.value = false
+          getList()
+        })
+      } else {
+        let form_data = form.value; // 获取表单数据
+        let walletType = form_data.walletType;
+        let encrypt_key=""
+        if (walletType === 'cex') {
+          form_data.walletAddress = hashString(form_data.apiKey);
+          let apiSecret = form.value.apiSecret;
+          let tradePassword = form_data.tradePassword;
+          form_data.apiKey = "";
+          form_data.apiSecret = "";
+          form_data.tradePassword = "";
+          encrypt_key = aesEncrypt(apiSecret,tradePassword)
+        }
+        addWallet(form_data).then(response => {
+        if (walletType === 'cex') {
+          addAccount({userId:form_data.userId,walletName:form_data.walletName,apiKey: form_data.walletAddress,apiSecret:encrypt_key}).then(response => {
+            proxy.$modal.msgSuccess("新增成功")
+          })
+        }
+         
+          open.value = false
+          getList()
+        })
+      }
+    }
+  })
+}
+
+/** 删除按钮操作 */
+function handleDelete(row) {
+  const _ids = row.id || ids.value
+  proxy.$modal.confirm('是否确认删除钱包管理编号为"' + _ids + '"的数据项？').then(function() {
+    return delWallet(_ids)
+  }).then(() => {
+    getList()
+    proxy.$modal.msgSuccess("删除成功")
+  }).catch(() => {})
+}
+
+/** 导出按钮操作 */
+function handleExport() {
+  proxy.download('system/wallet/export', {
+    ...queryParams.value
+  }, `wallet_${new Date().getTime()}.xlsx`)
+}
+
+getList()
 </script>

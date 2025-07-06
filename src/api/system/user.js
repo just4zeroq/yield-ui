@@ -139,3 +139,12 @@ export function deptTreeSelect() {
     method: 'get'
   })
 }
+
+
+// 获取所有投资者
+export function getAllInvestor() {
+  return request({
+    url: '/system/user/list_all_investor',
+    method: 'get'
+  })
+}

@@ -1,5 +1,6 @@
 import JSEncrypt from 'jsencrypt/bin/jsencrypt.min'
-
+import MD5 from 'crypto-js/md5';
+import * as CryptoJS from 'crypto-js'
 // 密钥对生成 http://web.chacuo.net/netrsakeypair
 
 const publicKey = 'MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAKoR8mX0rGKLqzcWmOzbfj64K8ZIgOdH\n' +
@@ -28,3 +29,45 @@ export function decrypt(txt) {
   return encryptor.decrypt(txt) // 对数据进行解密
 }
 
+export function hashString(input) {
+  return MD5(input).toString();
+}
+
+// 加密函数
+export function aesEncrypt(plainText, passwd) {
+  // 处理密码长度：不足补0，超过截取前16位
+  const processedPasswd = passwd.padEnd(16, '0').slice(0, 16);
+  
+  const key = CryptoJS.enc.Utf8.parse(processedPasswd);
+  const iv = CryptoJS.enc.Utf8.parse(processedPasswd);
+  
+  const encrypted = CryptoJS.AES.encrypt(
+    CryptoJS.enc.Utf8.parse(plainText),
+    key,
+    { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+  );
+  
+  return encrypted.toString();
+}
+
+// 解密函数
+export function aesDecrypt(cipherText, passwd) {
+  // 处理密码长度：不足补0，超过截取前16位
+  const processedPasswd = passwd.padEnd(16, '0').slice(0, 16);
+  
+  const key = CryptoJS.enc.Utf8.parse(processedPasswd);
+  const iv = CryptoJS.enc.Utf8.parse(processedPasswd);
+  
+  try {
+    const decrypted = CryptoJS.AES.decrypt(
+      cipherText,
+      key,
+      { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+    );
+    
+    return decrypted.toString(CryptoJS.enc.Utf8);
+  } catch (e) {
+    console.error('解密失败:', e);
+    return '';
+  }
+}

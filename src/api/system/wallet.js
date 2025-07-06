@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 
-// 查询【请填写功能名称】列表
+// 查询钱包管理列表
 export function listWallet(query) {
   return request({
     url: '/system/wallet/list',
@@ -8,18 +8,16 @@ export function listWallet(query) {
     params: query
   })
 }
-
-// 查询【请填写功能名称】列表
+// 查询钱包管理列表
 export function listWalletByRole(query) {
   return request({
-    url: '/system/wallet/list_by_role',
+    url: '/system/wallet/list',
     method: 'get',
     params: query
   })
 }
 
-
-// 查询【请填写功能名称】详细
+// 查询钱包管理详细
 export function getWallet(id) {
   return request({
     url: '/system/wallet/' + id,
@@ -27,7 +25,7 @@ export function getWallet(id) {
   })
 }
 
-// 新增【请填写功能名称】
+// 新增钱包管理
 export function addWallet(data) {
   return request({
     url: '/system/wallet',
@@ -36,7 +34,7 @@ export function addWallet(data) {
   })
 }
 
-// 修改【请填写功能名称】
+// 修改钱包管理
 export function updateWallet(data) {
   return request({
     url: '/system/wallet',
@@ -45,10 +43,24 @@ export function updateWallet(data) {
   })
 }
 
-// 删除【请填写功能名称】
+// 删除钱包管理
 export function delWallet(id) {
   return request({
     url: '/system/wallet/' + id,
     method: 'delete'
+  })
+}
+export function getWalletBalance(query) {
+  return request({
+    url: '/system/wallet/get_wallet_balance',
+    method: 'get',
+    params: query
+  })
+}
+export function buySymbol(data) {
+  return request({
+    url: '/system/wallet/buy_symbol',
+    method: 'post',
+    data: data
   })
 }
